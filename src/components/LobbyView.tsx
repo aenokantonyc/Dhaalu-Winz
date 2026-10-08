@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { DhayamPieceType, LudoAvatarType, Player, PlayerColor, RoomState } from '../types/game';
-import { Copy, Share2, Check, Lock, Unlock, UserX, Crown, Shield, Play } from 'lucide-react';
+import { DhayamPieceType, LudoAvatarType, LudoCustomRules, Player, PlayerColor, RoomState } from '../types/game';
+import { Copy, Share2, Check, Lock, Unlock, UserX, Crown, Shield, Play, Sliders } from 'lucide-react';
 import { audio } from '../utils/audio';
+import { RuleCustomizer } from './RuleCustomizer';
 
 interface LobbyViewProps {
   room: RoomState;
@@ -13,6 +14,7 @@ interface LobbyViewProps {
   onLockRoom: () => void;
   onRemovePlayer: (playerId: string) => void;
   onLeaveRoom: () => void;
+  onUpdateRules?: (rules: LudoCustomRules) => void;
 }
 
 const COLOR_CLASSES: Record<PlayerColor, { bg: string; border: string; text: string; dot: string }> = {
@@ -43,8 +45,10 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
   onLockRoom,
   onRemovePlayer,
   onLeaveRoom,
+  onUpdateRules,
 }) => {
   const [copied, setCopied] = useState(false);
+  const [showRuleEditor, setShowRuleEditor] = useState(false);
 
   const me = room.players.find(p => p.id === currentUserId);
   const isHost = me?.isHost ?? false;
@@ -140,12 +144,41 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
             <span className="font-semibold text-slate-200">{room.players.length} / {room.maxPlayers}</span>
           </div>
 
-          <div className="bg-slate-950/50 p-3 rounded-xl border border-slate-800/60">
-            <span className="text-slate-400 block mb-1">Rules:</span>
-            <span className="font-semibold text-slate-200">
-              {room.boardType === 'dhayam' ? 'Fixed Dhayam' : 'Custom Ludo'}
-            </span>
-          </div>
+          {room.boardType === 'classic_ludo' ? (
+            <div className="bg-slate-950/50 p-3 rounded-xl border border-slate-800/60 flex items-center justify-between">
+              <div>
+                <span className="text-slate-400 block mb-1">Custom Rules:</span>
+                <span className="font-semibold text-slate-200">
+                  Base: {room.rules.entryRoll || '1'} · Win: {room.rules.piecesToWin || 4}P
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  audio.playClick();
+                  setShowRuleEditor(!showRuleEditor);
+                }}
+                className="px-2 py-1 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-[10px] font-bold border border-amber-500/40 flex items-center gap-1 cursor-pointer"
+              >
+                <Sliders className="w-3 h-3" />
+                <span>{showRuleEditor ? 'Close Rules' : isHost ? 'Edit Rules' : 'View Rules'}</span>
+              </button>
+            </div>
+          ) : room.boardType === 'modern_ludo' ? (
+            <div className="bg-slate-950/50 p-3 rounded-xl border border-slate-800/60">
+              <span className="text-slate-400 block mb-1">Rules:</span>
+              <span className="font-semibold text-emerald-400 text-xs">
+                Standard Modern (All Selected)
+              </span>
+            </div>
+          ) : (
+            <div className="bg-slate-950/50 p-3 rounded-xl border border-slate-800/60">
+              <span className="text-slate-400 block mb-1">Rules:</span>
+              <span className="font-semibold text-amber-400 text-xs">
+                Authentic Dhayam
+              </span>
+            </div>
+          )}
 
           <div className="bg-slate-950/50 p-3 rounded-xl border border-slate-800/60">
             <span className="text-slate-400 block mb-1">Ready Status:</span>
@@ -155,6 +188,21 @@ export const LobbyView: React.FC<LobbyViewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Rule Customizer in Lobby (Classic Ludo Only) */}
+      {showRuleEditor && room.boardType === 'classic_ludo' && (
+        <div className="mb-6 animate-in fade-in duration-200">
+          <RuleCustomizer
+            rules={room.rules}
+            onChange={updated => {
+              if (isHost && onUpdateRules) {
+                onUpdateRules(updated);
+              }
+            }}
+            disabled={!isHost}
+          />
+        </div>
+      )}
 
       {/* Players List */}
       <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 mb-6 shadow-xl">

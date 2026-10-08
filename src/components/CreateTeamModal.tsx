@@ -1,12 +1,21 @@
-import React, { useState } from 'react';
-import { BoardType, DhayamPieceType, LudoAvatarType, LudoCustomRules } from '../types/game';
-import { X, Shield, Lock, Globe } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import {
+  BoardType,
+  DhayamPieceType,
+  LudoAvatarType,
+  LudoCustomRules,
+  MODERN_LUDO_STANDARD_RULES,
+  CLASSIC_LUDO_DEFAULT_RULES,
+} from '../types/game';
+import { X, Lock, Globe } from 'lucide-react';
 import { audio } from '../utils/audio';
+import { RuleCustomizer } from './RuleCustomizer';
 
 interface CreateTeamModalProps {
   isOpen: boolean;
   onClose: () => void;
   defaultPlayerName: string;
+  boardType: BoardType;
   onCreateRoom: (params: {
     playerName: string;
     boardType: BoardType;
@@ -22,21 +31,25 @@ export const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
   isOpen,
   onClose,
   defaultPlayerName,
+  boardType,
   onCreateRoom,
 }) => {
   const [playerName, setPlayerName] = useState(defaultPlayerName || 'Player');
-  const [boardType, setBoardType] = useState<BoardType>('classic_ludo');
   const [maxPlayers, setMaxPlayers] = useState<number>(4);
   const [isPrivate, setIsPrivate] = useState<boolean>(true);
 
   // Custom rules for Ludo
-  const [rules, setRules] = useState<LudoCustomRules>({
-    oneRequiredToEnter: true, // Always locked ON
-    extraTurnOnOne: true,
-    extraTurnOnCapture: true,
-    safeZones: true,
-    blockades: true,
-  });
+  const [rules, setRules] = useState<LudoCustomRules>(
+    boardType === 'modern_ludo' ? MODERN_LUDO_STANDARD_RULES : CLASSIC_LUDO_DEFAULT_RULES
+  );
+
+  useEffect(() => {
+    if (boardType === 'modern_ludo') {
+      setRules(MODERN_LUDO_STANDARD_RULES);
+    } else if (boardType === 'classic_ludo') {
+      setRules(CLASSIC_LUDO_DEFAULT_RULES);
+    }
+  }, [boardType]);
 
   // Piece selections
   const [dhayamPiece, setDhayamPiece] = useState<DhayamPieceType>('sticks');
@@ -52,16 +65,23 @@ export const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
       boardType,
       maxPlayers,
       isPrivate,
-      rules,
+      rules: boardType === 'modern_ludo' ? MODERN_LUDO_STANDARD_RULES : rules,
       pieceType: boardType === 'dhayam' ? dhayamPiece : undefined,
       avatarType: boardType !== 'dhayam' ? ludoAvatar : undefined,
     });
+  };
+
+  const getTitle = () => {
+    if (boardType === 'dhayam') return 'Create Team - Dhayam';
+    if (boardType === 'modern_ludo') return 'Create Team - Modern Ludo';
+    return 'Create Team - Classic Ludo';
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto animate-in fade-in duration-200">
       <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-lg p-6 sm:p-8 shadow-2xl relative text-slate-100 my-8">
         <button
+          type="button"
           onClick={() => {
             audio.playClick();
             onClose();
@@ -71,15 +91,22 @@ export const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
           <X className="w-5 h-5" />
         </button>
 
-        <h2 className="text-2xl font-bold tracking-tight text-white mb-6">
-          CREATE GAME
-        </h2>
+        <div className="mb-6">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-xl">
+              {boardType === 'dhayam' ? '🎲' : boardType === 'classic_ludo' ? '♟️' : '✨'}
+            </span>
+            <h2 className="text-xl font-bold tracking-tight text-white uppercase">
+              {getTitle()}
+            </h2>
+          </div>
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* PLAYER NAME */}
           <div>
             <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 block mb-2">
-              PLAYER NAME
+              Your Name
             </label>
             <input
               type="text"
@@ -90,63 +117,10 @@ export const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
             />
           </div>
 
-          {/* BOARD SELECTION */}
-          <div>
-            <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 block mb-2">
-              BOARD
-            </label>
-            <div className="grid grid-cols-3 gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  audio.playClick();
-                  setBoardType('dhayam');
-                }}
-                className={`py-2.5 px-3 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
-                  boardType === 'dhayam'
-                    ? 'bg-amber-500 text-slate-950 border-amber-500 shadow-md'
-                    : 'bg-slate-950 text-slate-300 border-slate-800 hover:border-slate-700'
-                }`}
-              >
-                Dhayam
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  audio.playClick();
-                  setBoardType('classic_ludo');
-                }}
-                className={`py-2.5 px-3 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
-                  boardType === 'classic_ludo'
-                    ? 'bg-blue-600 text-white border-blue-600 shadow-md'
-                    : 'bg-slate-950 text-slate-300 border-slate-800 hover:border-slate-700'
-                }`}
-              >
-                Classic Ludo
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  audio.playClick();
-                  setBoardType('modern_ludo');
-                }}
-                className={`py-2.5 px-3 rounded-xl text-xs font-semibold border transition-all cursor-pointer ${
-                  boardType === 'modern_ludo'
-                    ? 'bg-emerald-600 text-white border-emerald-600 shadow-md'
-                    : 'bg-slate-950 text-slate-300 border-slate-800 hover:border-slate-700'
-                }`}
-              >
-                Modern Ludo
-              </button>
-            </div>
-          </div>
-
           {/* NUMBER OF PLAYERS */}
           <div>
             <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 block mb-2">
-              NUMBER OF PLAYERS
+              Number of Players
             </label>
             <div className="grid grid-cols-3 gap-2">
               {[2, 3, 4].map(num => (
@@ -172,7 +146,7 @@ export const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
           {/* ROOM TYPE */}
           <div>
             <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 block mb-2">
-              ROOM TYPE
+              Room Visibility
             </label>
             <div className="grid grid-cols-2 gap-2">
               <button
@@ -188,7 +162,7 @@ export const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
                 }`}
               >
                 <Lock className="w-3.5 h-3.5" />
-                Private
+                Private (Code)
               </button>
 
               <button
@@ -212,78 +186,43 @@ export const CreateTeamModal: React.FC<CreateTeamModalProps> = ({
           {/* RULES CONFIGURATION */}
           <div>
             <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 block mb-2">
-              RULES
+              Rules
             </label>
 
-            {boardType === 'dhayam' ? (
-              <div className="p-3 bg-amber-950/40 border border-amber-800/40 rounded-xl text-xs text-amber-200/90 space-y-1">
-                <div className="font-semibold text-amber-300">Fixed Dhayam Rules</div>
-                <div>· 1 (Dhayam) required to enter the board</div>
-                <div>· Extra turn on 1, 5, 6, 12, or opponent capture</div>
-                <div>· Cross (Malai) squares are safe zones</div>
-                <div>· Concentric outer & inner track leading to Pazham</div>
-              </div>
-            ) : (
-              <div className="space-y-2 bg-slate-950 p-3.5 rounded-xl border border-slate-800 text-xs">
-                {/* 1 required to enter — ON (locked) */}
-                <div className="flex items-center justify-between text-slate-300 py-1 border-b border-slate-800/60">
-                  <span className="font-medium">1 required to enter</span>
-                  <span className="text-[11px] font-bold text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800/50">
-                    LOCKED ON
+            {boardType === 'modern_ludo' ? (
+              /* Modern Ludo: All selected, no toggle button */
+              <div className="p-3.5 bg-slate-950 border border-emerald-900/40 rounded-xl text-xs space-y-1.5">
+                <div className="font-bold text-emerald-400 flex items-center justify-between">
+                  <span>Standard Modern Rules</span>
+                  <span className="text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-800 px-2 py-0.5 rounded font-mono">
+                    ALL SELECTED
                   </span>
                 </div>
-
-                {/* Extra turn on 1 */}
-                <label className="flex items-center justify-between text-slate-300 py-1 cursor-pointer">
-                  <span>Extra turn on 1</span>
-                  <input
-                    type="checkbox"
-                    checked={rules.extraTurnOnOne}
-                    onChange={e => setRules({ ...rules, extraTurnOnOne: e.target.checked })}
-                    className="w-4 h-4 accent-amber-500 rounded"
-                  />
-                </label>
-
-                {/* Extra turn on capture */}
-                <label className="flex items-center justify-between text-slate-300 py-1 cursor-pointer">
-                  <span>Extra turn on capture</span>
-                  <input
-                    type="checkbox"
-                    checked={rules.extraTurnOnCapture}
-                    onChange={e => setRules({ ...rules, extraTurnOnCapture: e.target.checked })}
-                    className="w-4 h-4 accent-amber-500 rounded"
-                  />
-                </label>
-
-                {/* Safe zones */}
-                <label className="flex items-center justify-between text-slate-300 py-1 cursor-pointer">
-                  <span>Safe zones</span>
-                  <input
-                    type="checkbox"
-                    checked={rules.safeZones}
-                    onChange={e => setRules({ ...rules, safeZones: e.target.checked })}
-                    className="w-4 h-4 accent-amber-500 rounded"
-                  />
-                </label>
-
-                {/* Blockades */}
-                <label className="flex items-center justify-between text-slate-300 py-1 cursor-pointer">
-                  <span>Blockades (2 pieces block path)</span>
-                  <input
-                    type="checkbox"
-                    checked={rules.blockades}
-                    onChange={e => setRules({ ...rules, blockades: e.target.checked })}
-                    className="w-4 h-4 accent-amber-500 rounded"
-                  />
-                </label>
+                <div className="text-slate-300 grid grid-cols-2 gap-1 text-[11px] pt-1 border-t border-slate-800/80">
+                  <div>✓ Entry on 6</div>
+                  <div>✓ Extra roll on 6 & capture</div>
+                  <div>✓ Star safe zones active</div>
+                  <div>✓ 4 pieces to win</div>
+                </div>
               </div>
+            ) : boardType === 'dhayam' ? (
+              /* Dhayam */
+              <div className="p-3.5 bg-amber-950/40 border border-amber-800/40 rounded-xl text-xs text-amber-200/90 space-y-1">
+                <div className="font-bold text-amber-300">Authentic Dhayam Rules</div>
+                <div>• Roll 1 (Dhayam) to enter board</div>
+                <div>• Extra roll on 1, 5, 6, 12, or capture</div>
+                <div>• Cross (Malai) safe squares</div>
+              </div>
+            ) : (
+              /* Classic Ludo: players can define rules */
+              <RuleCustomizer rules={rules} onChange={setRules} />
             )}
           </div>
 
           {/* PIECE / AVATAR SELECTION */}
           <div>
             <label className="text-xs font-semibold uppercase tracking-wider text-slate-400 block mb-2">
-              SELECT PIECE TYPE
+              Select Piece Type
             </label>
 
             {boardType === 'dhayam' ? (

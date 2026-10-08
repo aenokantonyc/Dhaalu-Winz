@@ -5,6 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import {
   BoardType,
+  ChatMessage,
   LudoCustomRules,
   PieceState,
   Player,
@@ -115,6 +116,9 @@ wss.on('connection', (ws: WebSocket) => {
         if (player) {
           player.isConnected = false;
         }
+        if (room.voiceUsers && room.voiceUsers[info.playerId]) {
+          delete room.voiceUsers[info.playerId];
+        }
         broadcastRoom(info.roomId);
       }
       clientToRoom.delete(ws);
@@ -150,13 +154,31 @@ function handleMessage(ws: WebSocket, msg: any) {
         isConnected: true,
       };
 
-      const defaultRules: LudoCustomRules = {
-        oneRequiredToEnter: true,
-        extraTurnOnOne: rules?.extraTurnOnOne ?? true,
-        extraTurnOnCapture: rules?.extraTurnOnCapture ?? true,
-        safeZones: rules?.safeZones ?? true,
-        blockades: rules?.blockades ?? true,
-      };
+      const defaultRules: LudoCustomRules = boardType === 'modern_ludo'
+        ? {
+            entryRoll: '6',
+            oneRequiredToEnter: false,
+            extraTurnOnOne: false,
+            extraTurnOnSix: true,
+            extraTurnOnCapture: true,
+            safeZones: true,
+            blockades: true,
+            captureRequiredToEnterHome: false,
+            exactRollToEnterHome: true,
+            piecesToWin: 4,
+          }
+        : {
+            entryRoll: rules?.entryRoll || '1',
+            oneRequiredToEnter: (rules?.entryRoll || '1') === '1',
+            extraTurnOnOne: rules?.extraTurnOnOne ?? true,
+            extraTurnOnSix: rules?.extraTurnOnSix ?? true,
+            extraTurnOnCapture: rules?.extraTurnOnCapture ?? true,
+            safeZones: rules?.safeZones ?? true,
+            blockades: rules?.blockades ?? true,
+            captureRequiredToEnterHome: rules?.captureRequiredToEnterHome ?? false,
+            exactRollToEnterHome: rules?.exactRollToEnterHome ?? true,
+            piecesToWin: rules?.piecesToWin ?? 4,
+          };
 
       const newRoom: RoomState = {
         roomId,
@@ -179,6 +201,8 @@ function handleMessage(ws: WebSocket, msg: any) {
         pieces: [],
         validMoves: [],
         statusMessage: `Room created with code ${roomCode}. Waiting for players to join...`,
+        chatMessages: [],
+        voiceUsers: {},
       };
 
       rooms.set(roomId, newRoom);
@@ -308,11 +332,10 @@ function handleMessage(ws: WebSocket, msg: any) {
 
       if (msg.boardType) room.boardType = msg.boardType;
       if (msg.maxPlayers) room.maxPlayers = Math.max(2, Math.min(4, msg.maxPlayers));
-      if (msg.rules && room.boardType !== 'dhayam') {
+      if (msg.rules && room.boardType === 'classic_ludo') {
         room.rules = {
           ...room.rules,
           ...msg.rules,
-          oneRequiredToEnter: true, // Always locked ON
         };
       }
 
@@ -430,19 +453,21 @@ function handleMessage(ws: WebSocket, msg: any) {
         // Classic or Modern Ludo
         const diceRes = rollLudoDice(room.rules);
         room.ludoDice = diceRes;
+        const playerCaptures = room.playerCaptures?.[currentTurnPlayer.id] || 0;
         const validMoves = getLudoValidMoves(
           room.pieces,
           currentTurnPlayer.id,
           currentTurnPlayer.color,
           diceRes.value,
-          room.rules
+          room.rules,
+          playerCaptures
         );
         room.validMoves = validMoves;
 
         if (validMoves.length === 0) {
           room.statusMessage = `${currentTurnPlayer.name} rolled a ${diceRes.value}. No valid moves.`;
           if (diceRes.extraTurn) {
-            room.statusMessage += ` Rolled 1 -> Extra turn! Roll again.`;
+            room.statusMessage += ` Rolled ${diceRes.value} -> Extra turn! Roll again.`;
             room.diceRolled = false;
           } else {
             room.turnPlayerIndex = (room.turnPlayerIndex + 1) % room.players.length;
@@ -581,6 +606,9 @@ function handleMessage(ws: WebSocket, msg: any) {
               const victim = opponentPiecesOnSquare[0];
               victim.step = -1; // Send back to base!
               captured = true;
+              if (!room.playerCaptures) room.playerCaptures = {};
+              room.playerCaptures[currentTurnPlayer.id] = (room.playerCaptures[currentTurnPlayer.id] || 0) + 1;
+
               if (room.rules.extraTurnOnCapture) {
                 extraTurn = true;
               }
@@ -593,14 +621,16 @@ function handleMessage(ws: WebSocket, msg: any) {
           }
         }
 
-        // Check victory in Ludo: All 4 pieces in Home!
+        // Check victory in Ludo: Reached required piecesToWin (default 4)
         const playerPieces = room.pieces.filter(p => p.playerId === currentTurnPlayer.id);
-        const allFinished = playerPieces.every(p => p.isFinished);
-        if (allFinished) {
+        const finishedPiecesCount = playerPieces.filter(p => p.isFinished).length;
+        const targetPiecesToWin = room.rules.piecesToWin || 4;
+
+        if (finishedPiecesCount >= targetPiecesToWin) {
           room.isFinished = true;
           room.winnerPlayerId = currentTurnPlayer.id;
           room.winnerName = currentTurnPlayer.name;
-          room.statusMessage = `🏆 ${currentTurnPlayer.name} has brought all 4 pieces Home and won!`;
+          room.statusMessage = `🏆 ${currentTurnPlayer.name} has brought ${finishedPiecesCount} piece(s) Home and won!`;
         }
       }
 
@@ -647,6 +677,127 @@ function handleMessage(ws: WebSocket, msg: any) {
       room.statusMessage = `Rematch started! ${currentTurnPlayer.name}'s turn. Roll the dice!`;
 
       broadcastRoom(info.roomId);
+      break;
+    }
+
+    case 'send_chat': {
+      const info = clientToRoom.get(ws);
+      if (!info) return;
+      const room = rooms.get(info.roomId);
+      if (!room) return;
+      const player = room.players.find(p => p.id === info.playerId);
+      if (!player) return;
+
+      const text = String(msg.text || '').trim();
+      if (!text) return;
+
+      const chatMsg: ChatMessage = {
+        id: 'msg_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+        senderId: player.id,
+        senderName: player.name,
+        senderColor: player.color,
+        text: text.slice(0, 160),
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        isQuickReaction: Boolean(msg.isQuickReaction),
+      };
+
+      if (!room.chatMessages) room.chatMessages = [];
+      room.chatMessages.push(chatMsg);
+      if (room.chatMessages.length > 80) {
+        room.chatMessages = room.chatMessages.slice(-80);
+      }
+
+      broadcastRoom(info.roomId);
+      break;
+    }
+
+    case 'voice_join': {
+      const info = clientToRoom.get(ws);
+      if (!info) return;
+      const room = rooms.get(info.roomId);
+      if (!room) return;
+
+      if (!room.voiceUsers) room.voiceUsers = {};
+      room.voiceUsers[info.playerId] = {
+        isMuted: Boolean(msg.isMuted),
+        joinedAt: Date.now(),
+      };
+
+      broadcastRoom(info.roomId);
+
+      // Notify other connected clients in room that peer joined voice
+      for (const [otherWs, otherInfo] of clientToRoom.entries()) {
+        if (otherInfo.roomId === info.roomId && otherInfo.playerId !== info.playerId) {
+          if (otherWs.readyState === WebSocket.OPEN) {
+            otherWs.send(
+              JSON.stringify({
+                type: 'voice_peer_joined',
+                peerId: info.playerId,
+              })
+            );
+          }
+        }
+      }
+      break;
+    }
+
+    case 'voice_leave': {
+      const info = clientToRoom.get(ws);
+      if (!info) return;
+      const room = rooms.get(info.roomId);
+      if (!room) return;
+
+      if (room.voiceUsers && room.voiceUsers[info.playerId]) {
+        delete room.voiceUsers[info.playerId];
+        broadcastRoom(info.roomId);
+
+        for (const [otherWs, otherInfo] of clientToRoom.entries()) {
+          if (otherInfo.roomId === info.roomId && otherInfo.playerId !== info.playerId) {
+            if (otherWs.readyState === WebSocket.OPEN) {
+              otherWs.send(
+                JSON.stringify({
+                  type: 'voice_peer_left',
+                  peerId: info.playerId,
+                })
+              );
+            }
+          }
+        }
+      }
+      break;
+    }
+
+    case 'voice_toggle_mute': {
+      const info = clientToRoom.get(ws);
+      if (!info) return;
+      const room = rooms.get(info.roomId);
+      if (!room || !room.voiceUsers) return;
+
+      if (room.voiceUsers[info.playerId]) {
+        room.voiceUsers[info.playerId].isMuted = Boolean(msg.isMuted);
+        broadcastRoom(info.roomId);
+      }
+      break;
+    }
+
+    case 'voice_signal': {
+      const info = clientToRoom.get(ws);
+      if (!info) return;
+      const targetPlayerId = msg.targetPlayerId;
+
+      for (const [targetWs, targetInfo] of clientToRoom.entries()) {
+        if (targetInfo.roomId === info.roomId && targetInfo.playerId === targetPlayerId) {
+          if (targetWs.readyState === WebSocket.OPEN) {
+            targetWs.send(
+              JSON.stringify({
+                type: 'voice_signal',
+                signal: msg.signal,
+                fromPlayerId: info.playerId,
+              })
+            );
+          }
+        }
+      }
       break;
     }
 

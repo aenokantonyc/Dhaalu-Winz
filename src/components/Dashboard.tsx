@@ -1,19 +1,18 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { BoardType } from '../types/game';
-import { Users, Plus, LogIn, Play, BookOpen, Settings, User, History } from 'lucide-react';
+import { Plus, LogIn, Play, BookOpen, Settings, User, History, X } from 'lucide-react';
 import { audio } from '../utils/audio';
 
 interface DashboardProps {
   isLoggedIn: boolean;
   playerName: string;
-  onCreateTeamClick: () => void;
+  onCreateTeamClick: (board?: BoardType) => void;
   onJoinTeamClick: () => void;
-  onPlayOfflineClick: () => void;
+  onPlayOfflineClick: (board?: BoardType) => void;
   onHowToPlayClick: () => void;
   onSettingsClick: () => void;
   onProfileClick: () => void;
   onGameHistoryClick: () => void;
-  onSelectBoardOffline: (board: BoardType) => void;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
@@ -26,23 +25,33 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onSettingsClick,
   onProfileClick,
   onGameHistoryClick,
-  onSelectBoardOffline,
 }) => {
+  const [genericPickerMode, setGenericPickerMode] = useState<'create' | 'offline' | null>(null);
+
+  const handlePickGame = (board: BoardType) => {
+    audio.playClick();
+    const mode = genericPickerMode;
+    setGenericPickerMode(null);
+    if (mode === 'create') {
+      onCreateTeamClick(board);
+    } else if (mode === 'offline') {
+      onPlayOfflineClick(board);
+    }
+  };
+
   return (
     <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 py-8">
       {/* Hero / Action Hub */}
-      <div className="mb-10 text-center sm:text-left flex flex-col sm:flex-row sm:items-center justify-between gap-6 pb-8 border-b border-slate-800">
+      <div className="mb-8 text-center sm:text-left flex flex-col sm:flex-row sm:items-center justify-between gap-6 pb-6 border-b border-slate-800">
         <div>
-          <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white mb-2">
+          <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white">
             Dhaalu Winz
           </h1>
-          <p className="text-slate-400 text-sm sm:text-base max-w-xl">
-            {isLoggedIn ? (
-              <span>Welcome back, <strong className="text-amber-400 font-semibold">{playerName}</strong>! Ready for your next match on Dhaalu Winz?</span>
-            ) : (
-              <span>Play traditional Dhayam and Ludo with friends online or offline on any device.</span>
-            )}
-          </p>
+          {isLoggedIn && (
+            <p className="text-slate-400 text-sm mt-1">
+              Welcome, <strong className="text-amber-400 font-semibold">{playerName}</strong>
+            </p>
+          )}
         </div>
 
         {/* Primary Action Buttons */}
@@ -50,7 +59,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <button
             onClick={() => {
               audio.playClick();
-              onCreateTeamClick();
+              setGenericPickerMode('create');
             }}
             className="flex items-center gap-2 px-5 py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-sm transition-all shadow-lg hover:shadow-amber-500/20 cursor-pointer"
           >
@@ -72,7 +81,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <button
             onClick={() => {
               audio.playClick();
-              onPlayOfflineClick();
+              setGenericPickerMode('offline');
             }}
             className="flex items-center gap-2 px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-sm transition-all shadow-md cursor-pointer"
           >
@@ -82,7 +91,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
         </div>
       </div>
 
-      {/* Quick Access Bar for Settings, How to Play, Profile & History */}
+      {/* Quick Access Bar */}
       <div className="flex flex-wrap items-center gap-3 mb-8">
         <button
           onClick={() => {
@@ -133,70 +142,56 @@ export const Dashboard: React.FC<DashboardProps> = ({
         )}
       </div>
 
-      {/* The 3 Separate Game Boards */}
+      {/* Game Cards */}
       <div className="mb-4">
-        <h2 className="text-xl font-bold tracking-tight text-white mb-1">
+        <h2 className="text-xl font-bold tracking-tight text-white mb-4">
           Select Game Mode
         </h2>
-        <p className="text-slate-400 text-xs">
-          Three separate board experiences with dedicated authentic rule systems.
-        </p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* 1. Dhayam */}
         <div className="bg-slate-900 border border-slate-800 hover:border-amber-500/50 rounded-2xl overflow-hidden transition-all group flex flex-col justify-between">
           <div>
-            <div className="h-44 bg-gradient-to-br from-amber-950/60 via-stone-900 to-amber-900/40 relative flex items-center justify-center p-4 border-b border-slate-800 overflow-hidden">
-              <div className="absolute inset-0 opacity-25 bg-[radial-gradient(#d97706_1px,transparent_1px)] [background-size:16px_16px]" />
-              {/* Miniature Dhayam icon & representation */}
-              <div className="relative text-center">
-                <div className="w-20 h-20 rounded-xl bg-amber-900/60 border border-amber-600/40 flex items-center justify-center shadow-inner mx-auto mb-2">
-                  <span className="text-3xl">🎲</span>
-                </div>
-                <div className="flex items-center justify-center gap-2 text-[11px] font-mono text-amber-300/90 bg-amber-950/80 px-2.5 py-0.5 rounded-md border border-amber-800/40">
-                  <span>Dayakattai Dice</span>
-                  <span>·</span>
-                  <span>Fixed Rules</span>
-                </div>
+            <div className="h-40 bg-gradient-to-br from-amber-950/60 via-stone-900 to-amber-900/40 relative flex items-center justify-center p-4 border-b border-slate-800">
+              <div className="w-16 h-16 rounded-xl bg-amber-900/60 border border-amber-600/40 flex items-center justify-center shadow-inner">
+                <span className="text-3xl">🎲</span>
               </div>
             </div>
 
             <div className="p-6">
-              <h3 className="text-lg font-bold text-white mb-1">
+              <h3 className="text-lg font-bold text-white mb-2">
                 Dhayam
               </h3>
-              <p className="text-xs text-slate-400 mb-4 leading-relaxed">
-                Traditional Indian strategy game with authentic Kolam cross-board layout, brass stick dice, concentric tracks, and Pazham objective.
-              </p>
-
-              <div className="space-y-1.5 text-xs text-slate-300 mb-4 bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Players:</span>
-                  <span className="font-semibold text-slate-200">2 to 4 Players</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Pieces:</span>
-                  <span className="font-semibold text-slate-200">Sticks, Pebbles, Shells, Seeds</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Rules:</span>
-                  <span className="font-semibold text-amber-400">Fixed Dhayam Rules</span>
-                </div>
+              <div className="text-xs text-slate-400 space-y-1">
+                <div>2 to 4 Players</div>
+                <div>Traditional Dayakattai Rules</div>
               </div>
             </div>
           </div>
 
-          <div className="p-6 pt-0">
+          <div className="p-6 pt-0 space-y-2">
             <button
+              type="button"
               onClick={() => {
                 audio.playClick();
-                onSelectBoardOffline('dhayam');
+                onPlayOfflineClick('dhayam');
               }}
               className="w-full py-2.5 rounded-xl bg-amber-500/10 hover:bg-amber-500 text-amber-300 hover:text-slate-950 font-semibold text-xs transition-colors border border-amber-500/30 hover:border-transparent cursor-pointer flex items-center justify-center gap-2"
             >
               <Play className="w-3.5 h-3.5 fill-current" />
               Play Dhayam Offline
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                audio.playClick();
+                onCreateTeamClick('dhayam');
+              }}
+              className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs transition-colors border border-slate-700 cursor-pointer flex items-center justify-center gap-2"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Create Dhayam Team
             </button>
           </div>
         </div>
@@ -204,55 +199,45 @@ export const Dashboard: React.FC<DashboardProps> = ({
         {/* 2. Classic Ludo */}
         <div className="bg-slate-900 border border-slate-800 hover:border-blue-500/50 rounded-2xl overflow-hidden transition-all group flex flex-col justify-between">
           <div>
-            <div className="h-44 bg-gradient-to-br from-blue-950/60 via-slate-900 to-indigo-950/40 relative flex items-center justify-center p-4 border-b border-slate-800 overflow-hidden">
-              <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#3b82f6_1px,transparent_1px)] [background-size:16px_16px]" />
-              <div className="relative text-center">
-                <div className="w-20 h-20 rounded-xl bg-blue-900/40 border border-blue-500/30 flex items-center justify-center shadow-inner mx-auto mb-2">
-                  <span className="text-3xl">♟️</span>
-                </div>
-                <div className="flex items-center justify-center gap-2 text-[11px] font-mono text-blue-300/90 bg-blue-950/80 px-2.5 py-0.5 rounded-md border border-blue-800/40">
-                  <span>Classic Cross</span>
-                  <span>·</span>
-                  <span>1 to Enter</span>
-                </div>
+            <div className="h-40 bg-gradient-to-br from-blue-950/60 via-slate-900 to-indigo-950/40 relative flex items-center justify-center p-4 border-b border-slate-800">
+              <div className="w-16 h-16 rounded-xl bg-blue-900/40 border border-blue-500/30 flex items-center justify-center shadow-inner">
+                <span className="text-3xl">♟️</span>
               </div>
             </div>
 
             <div className="p-6">
-              <h3 className="text-lg font-bold text-white mb-1">
-                Classic / Normal Ludo
+              <h3 className="text-lg font-bold text-white mb-2">
+                Classic Ludo
               </h3>
-              <p className="text-xs text-slate-400 mb-4 leading-relaxed">
-                Traditional 4-quadrant board with iconic Red, Green, Yellow, Blue home courts, safe zones, blockades, and 1 required to bring pieces out.
-              </p>
-
-              <div className="space-y-1.5 text-xs text-slate-300 mb-4 bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Players:</span>
-                  <span className="font-semibold text-slate-200">2 to 4 Players</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Pieces:</span>
-                  <span className="font-semibold text-slate-200">4 Pieces per Player</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Rules:</span>
-                  <span className="font-semibold text-blue-400">Selectable Custom Rules</span>
-                </div>
+              <div className="text-xs text-slate-400 space-y-1">
+                <div>2 to 4 Players</div>
+                <div>Customizable Rules</div>
               </div>
             </div>
           </div>
 
-          <div className="p-6 pt-0">
+          <div className="p-6 pt-0 space-y-2">
             <button
+              type="button"
               onClick={() => {
                 audio.playClick();
-                onSelectBoardOffline('classic_ludo');
+                onPlayOfflineClick('classic_ludo');
               }}
               className="w-full py-2.5 rounded-xl bg-blue-500/10 hover:bg-blue-600 text-blue-300 hover:text-white font-semibold text-xs transition-colors border border-blue-500/30 hover:border-transparent cursor-pointer flex items-center justify-center gap-2"
             >
               <Play className="w-3.5 h-3.5 fill-current" />
               Play Classic Ludo Offline
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                audio.playClick();
+                onCreateTeamClick('classic_ludo');
+              }}
+              className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs transition-colors border border-slate-700 cursor-pointer flex items-center justify-center gap-2"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Create Classic Ludo Team
             </button>
           </div>
         </div>
@@ -260,59 +245,109 @@ export const Dashboard: React.FC<DashboardProps> = ({
         {/* 3. Modern Ludo */}
         <div className="bg-slate-900 border border-slate-800 hover:border-emerald-500/50 rounded-2xl overflow-hidden transition-all group flex flex-col justify-between">
           <div>
-            <div className="h-44 bg-gradient-to-br from-emerald-950/60 via-slate-900 to-teal-950/40 relative flex items-center justify-center p-4 border-b border-slate-800 overflow-hidden">
-              <div className="absolute inset-0 opacity-20 bg-[radial-gradient(#10b981_1px,transparent_1px)] [background-size:16px_16px]" />
-              <div className="relative text-center">
-                <div className="w-20 h-20 rounded-xl bg-emerald-900/40 border border-emerald-500/30 flex items-center justify-center shadow-inner mx-auto mb-2">
-                  <span className="text-3xl">✨</span>
-                </div>
-                <div className="flex items-center justify-center gap-2 text-[11px] font-mono text-emerald-300/90 bg-emerald-950/80 px-2.5 py-0.5 rounded-md border border-emerald-800/40">
-                  <span>Modern Visuals</span>
-                  <span>·</span>
-                  <span>Ludo Rules</span>
-                </div>
+            <div className="h-40 bg-gradient-to-br from-emerald-950/60 via-slate-900 to-teal-950/40 relative flex items-center justify-center p-4 border-b border-slate-800">
+              <div className="w-16 h-16 rounded-xl bg-emerald-900/40 border border-emerald-500/30 flex items-center justify-center shadow-inner">
+                <span className="text-3xl">✨</span>
               </div>
             </div>
 
             <div className="p-6">
-              <h3 className="text-lg font-bold text-white mb-1">
+              <h3 className="text-lg font-bold text-white mb-2">
                 Modern Ludo
               </h3>
-              <p className="text-xs text-slate-400 mb-4 leading-relaxed">
-                Futuristic sleek presentation with glowing neon paths, glass aesthetics, and particle animations while preserving authentic Ludo rules.
-              </p>
-
-              <div className="space-y-1.5 text-xs text-slate-300 mb-4 bg-slate-950/60 p-3 rounded-xl border border-slate-800/80">
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Players:</span>
-                  <span className="font-semibold text-slate-200">2 to 4 Players</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Pieces:</span>
-                  <span className="font-semibold text-slate-200">4 Pieces per Player</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Rules:</span>
-                  <span className="font-semibold text-emerald-400">Selectable Custom Rules</span>
-                </div>
+              <div className="text-xs text-slate-400 space-y-1">
+                <div>2 to 4 Players</div>
+                <div>Standard Selected Rules</div>
               </div>
             </div>
           </div>
 
-          <div className="p-6 pt-0">
+          <div className="p-6 pt-0 space-y-2">
             <button
+              type="button"
               onClick={() => {
                 audio.playClick();
-                onSelectBoardOffline('modern_ludo');
+                onPlayOfflineClick('modern_ludo');
               }}
               className="w-full py-2.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-600 text-emerald-300 hover:text-white font-semibold text-xs transition-colors border border-emerald-500/30 hover:border-transparent cursor-pointer flex items-center justify-center gap-2"
             >
               <Play className="w-3.5 h-3.5 fill-current" />
               Play Modern Ludo Offline
             </button>
+            <button
+              type="button"
+              onClick={() => {
+                audio.playClick();
+                onCreateTeamClick('modern_ludo');
+              }}
+              className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs transition-colors border border-slate-700 cursor-pointer flex items-center justify-center gap-2"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              Create Modern Ludo Team
+            </button>
           </div>
         </div>
       </div>
+
+      {/* Generic Picker Modal if clicked from top hero buttons */}
+      {genericPickerMode && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-md p-6 shadow-2xl relative text-slate-100">
+            <button
+              type="button"
+              onClick={() => setGenericPickerMode(null)}
+              className="absolute top-4 right-4 p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <h3 className="text-lg font-bold text-white mb-1">
+              {genericPickerMode === 'create' ? 'Create Team' : 'Play Offline'}
+            </h3>
+            <p className="text-xs text-slate-400 mb-5">
+              Select game to open:
+            </p>
+
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={() => handlePickGame('dhayam')}
+                className="w-full p-4 rounded-xl bg-slate-950 border border-slate-800 hover:border-amber-500 text-left transition-all cursor-pointer flex items-center gap-3.5 hover:bg-amber-950/20"
+              >
+                <span className="text-2xl">🎲</span>
+                <div>
+                  <div className="font-bold text-white text-sm">Dhayam</div>
+                  <div className="text-xs text-slate-400">Authentic Dayakattai board</div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handlePickGame('classic_ludo')}
+                className="w-full p-4 rounded-xl bg-slate-950 border border-slate-800 hover:border-blue-500 text-left transition-all cursor-pointer flex items-center gap-3.5 hover:bg-blue-950/20"
+              >
+                <span className="text-2xl">♟️</span>
+                <div>
+                  <div className="font-bold text-white text-sm">Classic Ludo</div>
+                  <div className="text-xs text-slate-400">Customizable rule system</div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handlePickGame('modern_ludo')}
+                className="w-full p-4 rounded-xl bg-slate-950 border border-slate-800 hover:border-emerald-500 text-left transition-all cursor-pointer flex items-center gap-3.5 hover:bg-emerald-950/20"
+              >
+                <span className="text-2xl">✨</span>
+                <div>
+                  <div className="font-bold text-white text-sm">Modern Ludo</div>
+                  <div className="text-xs text-slate-400">Standard selected rules</div>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

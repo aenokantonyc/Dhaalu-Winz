@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   BoardType,
+  ChatMessage,
   DhayamPieceType,
   LudoAvatarType,
   LudoCustomRules,
@@ -26,6 +27,9 @@ import { HowToPlayModal } from './components/HowToPlayModal';
 import { ProfileModal } from './components/ProfileModal';
 import { SettingsModal } from './components/SettingsModal';
 import { OfflineGameSetupModal } from './components/OfflineGameSetupModal';
+import { VoiceBar } from './components/VoiceBar';
+import { ChatDrawer } from './components/ChatDrawer';
+import { voice, VoiceState } from './utils/voiceManager';
 import {
   rollDhayamDice,
   getDhayamValidMoves,
@@ -63,14 +67,73 @@ export default function App() {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showOfflineModal, setShowOfflineModal] = useState(false);
-  const [offlineDefaultBoard, setOfflineDefaultBoard] = useState<BoardType>('dhayam');
+  const [offlineBoard, setOfflineBoard] = useState<BoardType>('classic_ludo');
+  const [createTeamBoard, setCreateTeamBoard] = useState<BoardType>('classic_ludo');
 
   // Room & Game State (for both online and offline)
   const [activeRoom, setActiveRoom] = useState<RoomState | null>(null);
   const [isOfflineGame, setIsOfflineGame] = useState(false);
 
+  // Chat State
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
+  const lastMsgCountRef = useRef(0);
+
+  // Voice State
+  const [voiceState, setVoiceState] = useState<VoiceState>('disconnected');
+  const [isMicMuted, setIsMicMuted] = useState(false);
+  const [isAudioDeafened, setIsAudioDeafened] = useState(false);
+  const [isLocalSpeaking, setIsLocalSpeaking] = useState(false);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+
   // WebSocket reference
   const wsRef = useRef<WebSocket | null>(null);
+
+  // Configure VoiceManager callbacks
+  useEffect(() => {
+    voice.setCallbacks({
+      onStateChange: (state, err) => {
+        setVoiceState(state);
+        setVoiceError(err || null);
+      },
+      onSpeakingChange: (isSpeaking) => {
+        setIsLocalSpeaking(isSpeaking);
+      },
+      sendSignal: (targetPlayerId, signal) => {
+        sendWs({
+          type: 'voice_signal',
+          targetPlayerId,
+          signal,
+        });
+      },
+    });
+
+    return () => {
+      voice.leaveVoice();
+    };
+  }, []);
+
+  // Track unread chat messages when chat is closed
+  useEffect(() => {
+    if (activeRoom?.chatMessages) {
+      const currentCount = activeRoom.chatMessages.length;
+      if (!isChatOpen && currentCount > lastMsgCountRef.current) {
+        setUnreadChatCount(prev => prev + (currentCount - lastMsgCountRef.current));
+      }
+      lastMsgCountRef.current = currentCount;
+    }
+  }, [activeRoom?.chatMessages, isChatOpen]);
+
+  // Reset unread count when chat is opened
+  const handleToggleChatOpen = () => {
+    setIsChatOpen(prev => {
+      const next = !prev;
+      if (next) {
+        setUnreadChatCount(0);
+      }
+      return next;
+    });
+  };
 
   // Subscribe to Auth changes
   useEffect(() => {
@@ -107,6 +170,12 @@ export default function App() {
             setIsOfflineGame(false);
             setShowJoinTeamModal(false);
             setJoinError(null);
+          } else if (data.type === 'voice_peer_joined') {
+            voice.handlePeerJoined(data.peerId);
+          } else if (data.type === 'voice_peer_left') {
+            voice.handlePeerLeft(data.peerId);
+          } else if (data.type === 'voice_signal') {
+            voice.handleSignal(data.fromPlayerId, data.signal);
           } else if (data.type === 'error') {
             setJoinError(data.message);
           }
@@ -130,7 +199,10 @@ export default function App() {
   }, []);
 
   // Guest clicks CREATE TEAM
-  const handleCreateTeamClick = () => {
+  const handleCreateTeamClick = (board?: BoardType) => {
+    if (board) {
+      setCreateTeamBoard(board);
+    }
     if (!auth.isLoggedIn()) {
       setLoginReason('create_team');
       setPendingActionAfterLogin('create_team');
@@ -143,6 +215,13 @@ export default function App() {
       return;
     }
     setShowCreateTeamModal(true);
+  };
+
+  const handlePlayOfflineClick = (board?: BoardType) => {
+    if (board) {
+      setOfflineBoard(board);
+    }
+    setShowOfflineModal(true);
   };
 
   // Guest clicks JOIN TEAM
@@ -255,10 +334,82 @@ export default function App() {
     sendWs({ type: 'host_remove_player', targetPlayerId: targetId });
   };
 
+  const handleUpdateRules = (updatedRules: LudoCustomRules) => {
+    if (isOfflineGame) {
+      if (activeRoom) {
+        setActiveRoom({ ...activeRoom, rules: updatedRules });
+      }
+    } else {
+      sendWs({ type: 'host_update_settings', rules: updatedRules });
+    }
+  };
+
   const handleLeaveRoom = () => {
     audio.playClick();
+    voice.leaveVoice();
+    sendWs({ type: 'voice_leave' });
     setActiveRoom(null);
     setIsOfflineGame(false);
+  };
+
+  // Voice Action Handlers
+  const handleJoinVoice = async () => {
+    const ok = await voice.joinVoice(currentUserId);
+    if (ok) {
+      sendWs({
+        type: 'voice_join',
+        isMuted: voice.getMuted(),
+      });
+    }
+  };
+
+  const handleLeaveVoice = () => {
+    voice.leaveVoice();
+    sendWs({ type: 'voice_leave' });
+  };
+
+  const handleToggleVoiceMute = () => {
+    const next = !voice.getMuted();
+    voice.setMuted(next);
+    setIsMicMuted(next);
+    sendWs({
+      type: 'voice_toggle_mute',
+      isMuted: next,
+    });
+  };
+
+  const handleToggleVoiceDeafen = () => {
+    const next = !voice.getDeafened();
+    voice.setDeafened(next);
+    setIsAudioDeafened(next);
+  };
+
+  // Chat Action Handler
+  const handleSendMessage = (text: string, isQuickReaction?: boolean) => {
+    if (!isOfflineGame) {
+      sendWs({
+        type: 'send_chat',
+        text,
+        isQuickReaction,
+      });
+    } else if (activeRoom) {
+      // Offline local match chat
+      const currentTurnPlayer = activeRoom.players[activeRoom.turnPlayerIndex];
+      const newMsg: ChatMessage = {
+        id: 'local_msg_' + Date.now(),
+        senderId: currentTurnPlayer.id,
+        senderName: currentTurnPlayer.name,
+        senderColor: currentTurnPlayer.color,
+        text: text.slice(0, 160),
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        isQuickReaction,
+      };
+      const msgs = [...(activeRoom.chatMessages || []), newMsg];
+      setActiveRoom({
+        ...activeRoom,
+        chatMessages: msgs.slice(-80),
+      });
+    }
   };
 
   // In-Game Dice Roll
@@ -302,19 +453,21 @@ export default function App() {
     } else {
       const dice = rollLudoDice(room.rules);
       room.ludoDice = dice;
+      const playerCaptures = room.playerCaptures?.[currentTurnPlayer.id] || 0;
       const validMoves = getLudoValidMoves(
         room.pieces,
         currentTurnPlayer.id,
         currentTurnPlayer.color,
         dice.value,
-        room.rules
+        room.rules,
+        playerCaptures
       );
       room.validMoves = validMoves;
 
       if (validMoves.length === 0) {
         room.statusMessage = `${currentTurnPlayer.name} rolled a ${dice.value}. No moves possible.`;
         if (dice.extraTurn) {
-          room.statusMessage += ' Rolled 1 -> Extra turn! Roll again.';
+          room.statusMessage += ` Rolled ${dice.value} -> Extra turn! Roll again.`;
           room.diceRolled = false;
         } else {
           room.turnPlayerIndex = (room.turnPlayerIndex + 1) % room.players.length;
@@ -443,6 +596,9 @@ export default function App() {
             const victim = oppsOnSquare[0];
             victim.step = -1;
             captured = true;
+            if (!room.playerCaptures) room.playerCaptures = {};
+            room.playerCaptures[currentTurnPlayer.id] = (room.playerCaptures[currentTurnPlayer.id] || 0) + 1;
+
             audio.playCapture();
             if (room.rules.extraTurnOnCapture) {
               extraTurn = true;
@@ -456,13 +612,16 @@ export default function App() {
         }
       }
 
-      // Check victory
+      // Check victory: Reached required piecesToWin (default 4)
       const playerPieces = room.pieces.filter(p => p.playerId === currentTurnPlayer.id);
-      if (playerPieces.every(p => p.isFinished)) {
+      const finishedPiecesCount = playerPieces.filter(p => p.isFinished).length;
+      const targetPiecesToWin = room.rules.piecesToWin || 4;
+
+      if (finishedPiecesCount >= targetPiecesToWin) {
         room.isFinished = true;
         room.winnerPlayerId = currentTurnPlayer.id;
         room.winnerName = currentTurnPlayer.name;
-        room.statusMessage = `🏆 ${currentTurnPlayer.name} won!`;
+        room.statusMessage = `🏆 ${currentTurnPlayer.name} has completed ${finishedPiecesCount} piece(s) and won!`;
         auth.recordGameResult({
           boardType: room.boardType,
           won: true,
@@ -587,6 +746,8 @@ export default function App() {
       pieces,
       validMoves: [],
       statusMessage: `Match started! ${firstPlayer.name}'s turn (${firstPlayer.color.toUpperCase()}). Roll the dice!`,
+      chatMessages: [],
+      voiceUsers: {},
     };
 
     setActiveRoom(newOfflineRoom);
@@ -596,7 +757,7 @@ export default function App() {
 
   // Quick offline board selection from dashboard cards
   const handleSelectBoardOffline = (board: BoardType) => {
-    setOfflineDefaultBoard(board);
+    setOfflineBoard(board);
     setShowOfflineModal(true);
   };
 
@@ -609,7 +770,7 @@ export default function App() {
       {/* Top Navbar adhering to Top Bar Contract */}
       <Navbar
         onOpenOffline={() => {
-          setOfflineDefaultBoard('classic_ludo');
+          setOfflineBoard('classic_ludo');
           setShowOfflineModal(true);
         }}
         onOpenHowToPlay={() => setShowHowToPlayModal(true)}
@@ -633,46 +794,80 @@ export default function App() {
             playerName={playerName}
             onCreateTeamClick={handleCreateTeamClick}
             onJoinTeamClick={handleJoinTeamClick}
-            onPlayOfflineClick={() => {
-              setOfflineDefaultBoard('classic_ludo');
-              setShowOfflineModal(true);
-            }}
+            onPlayOfflineClick={handlePlayOfflineClick}
             onHowToPlayClick={() => setShowHowToPlayModal(true)}
             onSettingsClick={() => setShowSettingsModal(true)}
             onProfileClick={() => setShowProfileModal(true)}
             onGameHistoryClick={() => setShowProfileModal(true)}
-            onSelectBoardOffline={handleSelectBoardOffline}
           />
         ) : !activeRoom.isStarted ? (
           // Team Lobby View
-          <LobbyView
-            room={activeRoom}
-            currentUserId={currentUserId}
-            onToggleReady={handleToggleReady}
-            onChangeDhayamPiece={handleChangeDhayamPiece}
-            onChangeLudoAvatar={handleChangeLudoAvatar}
-            onStartGame={handleStartGame}
-            onLockRoom={handleLockRoom}
-            onRemovePlayer={handleRemovePlayer}
-            onLeaveRoom={handleLeaveRoom}
-          />
+          <div className="w-full flex-1 flex flex-col items-center">
+            {!isOfflineGame && (
+              <div className="w-full max-w-4xl mx-auto px-4 pt-4">
+                <VoiceBar
+                  room={activeRoom}
+                  currentUserId={currentUserId}
+                  voiceState={voiceState}
+                  isMuted={isMicMuted}
+                  isDeafened={isAudioDeafened}
+                  isLocalSpeaking={isLocalSpeaking}
+                  voiceError={voiceError}
+                  onJoinVoice={handleJoinVoice}
+                  onLeaveVoice={handleLeaveVoice}
+                  onToggleMute={handleToggleVoiceMute}
+                  onToggleDeafen={handleToggleVoiceDeafen}
+                />
+              </div>
+            )}
+            <LobbyView
+              room={activeRoom}
+              currentUserId={currentUserId}
+              onToggleReady={handleToggleReady}
+              onChangeDhayamPiece={handleChangeDhayamPiece}
+              onChangeLudoAvatar={handleChangeLudoAvatar}
+              onStartGame={handleStartGame}
+              onLockRoom={handleLockRoom}
+              onRemovePlayer={handleRemovePlayer}
+              onLeaveRoom={handleLeaveRoom}
+              onUpdateRules={handleUpdateRules}
+            />
+          </div>
         ) : (
           // Active Game Screen
           <div className="w-full flex-1 flex flex-col items-center">
-            {/* Quick in-game return affordance */}
-            <div className="w-full max-w-5xl mx-auto px-4 pt-3 flex items-center justify-between">
-              <button
-                onClick={handleLeaveRoom}
-                className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 transition-colors cursor-pointer"
-              >
-                <ArrowLeft className="w-3.5 h-3.5" />
-                <span>Exit Match</span>
-              </button>
+            {/* Quick in-game return affordance & Voice Bar */}
+            <div className="w-full max-w-5xl mx-auto px-4 pt-3 flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <button
+                  onClick={handleLeaveRoom}
+                  className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-white px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 transition-colors cursor-pointer"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>Exit Match</span>
+                </button>
 
-              {isOfflineGame && (
-                <span className="text-[11px] font-mono font-semibold text-emerald-400 bg-emerald-950/60 border border-emerald-800/40 px-2 py-0.5 rounded">
-                  OFFLINE PASS & PLAY
-                </span>
+                {isOfflineGame && (
+                  <span className="text-[11px] font-mono font-semibold text-emerald-400 bg-emerald-950/60 border border-emerald-800/40 px-2 py-0.5 rounded">
+                    OFFLINE PASS & PLAY
+                  </span>
+                )}
+              </div>
+
+              {!isOfflineGame && (
+                <VoiceBar
+                  room={activeRoom}
+                  currentUserId={currentUserId}
+                  voiceState={voiceState}
+                  isMuted={isMicMuted}
+                  isDeafened={isAudioDeafened}
+                  isLocalSpeaking={isLocalSpeaking}
+                  voiceError={voiceError}
+                  onJoinVoice={handleJoinVoice}
+                  onLeaveVoice={handleLeaveVoice}
+                  onToggleMute={handleToggleVoiceMute}
+                  onToggleDeafen={handleToggleVoiceDeafen}
+                />
               )}
             </div>
 
@@ -710,6 +905,18 @@ export default function App() {
         )}
       </main>
 
+      {/* Real-time Match Chat Drawer */}
+      {activeRoom && (
+        <ChatDrawer
+          messages={activeRoom.chatMessages || []}
+          currentUserId={currentUserId}
+          onSendMessage={handleSendMessage}
+          isOpen={isChatOpen}
+          onToggleOpen={handleToggleChatOpen}
+          unreadCount={unreadChatCount}
+        />
+      )}
+
       {/* Modals & Dialogs */}
       <GoogleSignInModal
         isOpen={showLoginModal}
@@ -727,6 +934,7 @@ export default function App() {
         isOpen={showCreateTeamModal}
         onClose={() => setShowCreateTeamModal(false)}
         defaultPlayerName={playerName}
+        boardType={createTeamBoard}
         onCreateRoom={handleCreateOnlineRoom}
       />
 
@@ -743,7 +951,7 @@ export default function App() {
       <OfflineGameSetupModal
         isOpen={showOfflineModal}
         onClose={() => setShowOfflineModal(false)}
-        defaultBoard={offlineDefaultBoard}
+        boardType={offlineBoard}
         onStartOfflineGame={handleStartOfflineGame}
       />
 

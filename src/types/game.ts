@@ -6,13 +6,46 @@ export type LudoAvatarType = 'crown' | 'star' | 'shield' | 'gem';
 
 export type PlayerColor = 'red' | 'green' | 'yellow' | 'blue';
 
+export type LudoEntryRoll = '1' | '6' | '1_or_6';
+
 export interface LudoCustomRules {
-  oneRequiredToEnter: true; // Always ON as required
+  entryRoll: LudoEntryRoll; // Which roll is required to bring piece out of base
+  oneRequiredToEnter?: boolean; // legacy compat
   extraTurnOnOne: boolean;
+  extraTurnOnSix: boolean; // Extra turn on rolling 6
   extraTurnOnCapture: boolean;
   safeZones: boolean;
   blockades: boolean;
+  captureRequiredToEnterHome: boolean; // Must have captured at least 1 opponent piece to enter home
+  exactRollToEnterHome: boolean; // Exact roll needed to land on finish
+  piecesToWin: number; // Number of pieces needed to finish to declare victory (1..4)
 }
+
+export const MODERN_LUDO_STANDARD_RULES: LudoCustomRules = {
+  entryRoll: '6',
+  oneRequiredToEnter: false,
+  extraTurnOnOne: false,
+  extraTurnOnSix: true,
+  extraTurnOnCapture: true,
+  safeZones: true,
+  blockades: true,
+  captureRequiredToEnterHome: false,
+  exactRollToEnterHome: true,
+  piecesToWin: 4,
+};
+
+export const CLASSIC_LUDO_DEFAULT_RULES: LudoCustomRules = {
+  entryRoll: '1',
+  oneRequiredToEnter: true,
+  extraTurnOnOne: true,
+  extraTurnOnSix: true,
+  extraTurnOnCapture: true,
+  safeZones: true,
+  blockades: true,
+  captureRequiredToEnterHome: false,
+  exactRollToEnterHome: true,
+  piecesToWin: 4,
+};
 
 export interface Player {
   id: string; // User ID
@@ -46,6 +79,16 @@ export interface LudoDiceResult {
   extraTurn: boolean;
 }
 
+export interface ChatMessage {
+  id: string;
+  senderId: string;
+  senderName: string;
+  senderColor: PlayerColor;
+  text: string;
+  timestamp: string;
+  isQuickReaction?: boolean;
+}
+
 export interface RoomState {
   roomId: string;
   roomCode: string; // e.g. LUDO-7X92 or DHAY-4M18
@@ -67,6 +110,9 @@ export interface RoomState {
   pieces: PieceState[];
   validMoves: number[]; // Piece IDs that can move
   statusMessage: string;
+  chatMessages: ChatMessage[];
+  voiceUsers: Record<string, { isMuted: boolean; joinedAt: number }>;
+  playerCaptures?: Record<string, number>;
   lastMoveInfo?: {
     playerColor: PlayerColor;
     captured?: boolean;

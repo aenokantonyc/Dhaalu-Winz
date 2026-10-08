@@ -10,7 +10,7 @@ import {
   TOTAL_STEPS_TO_FINISH,
 } from '../utils/ludoEngine';
 import { audio } from '../utils/audio';
-import { Crown, Star, Shield, Gem, Dices, Award } from 'lucide-react';
+import { Crown, Star, Shield, Gem, Dices, Award, Sliders, HelpCircle, X, Check } from 'lucide-react';
 
 interface ClassicLudoBoardProps {
   room: RoomState;
@@ -49,6 +49,7 @@ export const ClassicLudoBoard: React.FC<ClassicLudoBoardProps> = ({
   isOfflineMode = false,
 }) => {
   const [rollingAnim, setRollingAnim] = useState(false);
+  const [showRulesModal, setShowRulesModal] = useState(false);
 
   const currentTurnPlayer = room.players[room.turnPlayerIndex];
   const isMyTurn = isOfflineMode || currentTurnPlayer?.id === currentUserId;
@@ -117,8 +118,21 @@ export const ClassicLudoBoard: React.FC<ClassicLudoBoardProps> = ({
           </div>
         </div>
 
-        <div className="text-xs text-slate-300 text-center sm:text-right max-w-md bg-slate-950 px-3.5 py-2 rounded-xl border border-slate-800">
-          {room.statusMessage}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              audio.playClick();
+              setShowRulesModal(true);
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-bold transition-all cursor-pointer shadow-sm"
+          >
+            <Sliders className="w-3.5 h-3.5 text-amber-400" />
+            <span>Defined Rules</span>
+          </button>
+          <div className="text-xs text-slate-300 text-center sm:text-right max-w-xs bg-slate-950 px-3 py-2 rounded-xl border border-slate-800">
+            {room.statusMessage}
+          </div>
         </div>
       </div>
 
@@ -541,18 +555,187 @@ export const ClassicLudoBoard: React.FC<ClassicLudoBoardProps> = ({
           </div>
 
           {/* Active Custom Rules Card */}
-          <div className="bg-slate-900/80 border border-slate-800 rounded-xl p-3.5 text-[11px] text-slate-400 space-y-1.5">
-            <div className="font-bold text-slate-200 text-xs">
-              Selected Room Rules:
+          <div
+            onClick={() => {
+              audio.playClick();
+              setShowRulesModal(true);
+            }}
+            className="bg-slate-900/80 hover:bg-slate-900 border border-slate-800 hover:border-slate-700 rounded-xl p-3.5 text-[11px] text-slate-400 space-y-1.5 cursor-pointer transition-all shadow-md group"
+          >
+            <div className="font-bold text-slate-200 text-xs flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <Sliders className="w-3.5 h-3.5 text-amber-400" />
+                <span>Active Defined Rules</span>
+              </span>
+              <span className="text-[10px] text-amber-400 underline font-semibold group-hover:text-amber-300">
+                Details & Info
+              </span>
             </div>
-            <div className="text-emerald-400 font-semibold">• 1 required to enter: ON</div>
+            <div className="text-amber-300 font-semibold">
+              • Base Entry Roll:{' '}
+              <span className="font-bold text-white">
+                {room.rules.entryRoll === '6'
+                  ? '6 Only'
+                  : room.rules.entryRoll === '1_or_6'
+                  ? 'Either 1 or 6'
+                  : '1 Only'}
+              </span>
+            </div>
             <div>• Extra turn on 1: {room.rules.extraTurnOnOne ? 'ON' : 'OFF'}</div>
+            <div>• Extra turn on 6: {room.rules.extraTurnOnSix ? 'ON' : 'OFF'}</div>
             <div>• Extra turn on capture: {room.rules.extraTurnOnCapture ? 'ON' : 'OFF'}</div>
-            <div>• Safe zones: {room.rules.safeZones ? 'ON' : 'OFF'}</div>
+            <div>• Safe zones (Stars): {room.rules.safeZones ? 'ON' : 'OFF'}</div>
             <div>• Blockades: {room.rules.blockades ? 'ON' : 'OFF'}</div>
+            <div>• Capture Mandate: {room.rules.captureRequiredToEnterHome ? 'Required (Kill 1 for Home)' : 'OFF'}</div>
+            <div>• Exact Roll to Finish: {room.rules.exactRollToEnterHome ? 'Required' : 'OFF'}</div>
+            <div className="text-amber-400 font-semibold">
+              • Victory Goal: {room.rules.piecesToWin === 1 ? '1 Piece (Blitz)' : `${room.rules.piecesToWin || 4} Pieces Home`}
+            </div>
+
+            {room.rules.captureRequiredToEnterHome && (
+              <div className="pt-1 border-t border-slate-800 text-[10px] text-slate-300">
+                Your Captures:{' '}
+                <span className={`font-bold ${
+                  (room.playerCaptures?.[currentTurnPlayer.id] || 0) > 0 ? 'text-emerald-400' : 'text-amber-400'
+                }`}>
+                  {room.playerCaptures?.[currentTurnPlayer.id] || 0} / 1 required
+                </span>
+              </div>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Defined Rules Inspection Modal */}
+      {showRulesModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6 shadow-2xl relative">
+            <button
+              onClick={() => {
+                audio.playClick();
+                setShowRulesModal(false);
+              }}
+              className="absolute top-4 right-4 p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <div className="flex items-center gap-2 mb-2">
+              <Sliders className="w-5 h-5 text-amber-400" />
+              <h3 className="text-xl font-bold text-white">Defined Rules in this Match</h3>
+            </div>
+            <p className="text-xs text-slate-400 mb-6">
+              These rules were configured by the players and are actively enforced by the game engine.
+            </p>
+
+            <div className="space-y-3 text-xs">
+              {/* Base Entry */}
+              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 flex items-start gap-3">
+                <span className="p-2 rounded-lg bg-amber-500/10 text-amber-400 font-bold text-base mt-0.5">
+                  {room.rules.entryRoll || '1'}
+                </span>
+                <div>
+                  <div className="font-bold text-white text-sm">
+                    Base Entry Requirement:{' '}
+                    <span className="text-amber-400">
+                      {room.rules.entryRoll === '6'
+                        ? 'Roll 6 to Exit Base'
+                        : room.rules.entryRoll === '1_or_6'
+                        ? 'Roll Either 1 or 6'
+                        : 'Roll 1 to Exit Base (Default)'}
+                    </span>
+                  </div>
+                  <div className="text-slate-400 mt-1">
+                    {room.rules.entryRoll === '6'
+                      ? 'Pieces cannot leave the corner base yard unless a 6 is rolled.'
+                      : room.rules.entryRoll === '1_or_6'
+                      ? 'Pieces can leave the base yard upon rolling either a 1 or a 6.'
+                      : 'Pieces strictly require a roll of 1 to emerge onto the starting track.'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Extra Turns */}
+              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800">
+                <div className="font-bold text-white text-sm mb-2">Extra Turn Opportunities</div>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className={`p-2 rounded-lg border text-center ${
+                    room.rules.extraTurnOnOne ? 'bg-emerald-950/40 border-emerald-700/60 text-emerald-300' : 'bg-slate-900 border-slate-800 text-slate-500 line-through'
+                  }`}>
+                    <div className="font-bold">Roll 1</div>
+                    <div className="text-[10px]">{room.rules.extraTurnOnOne ? 'Extra Roll' : 'No Extra'}</div>
+                  </div>
+                  <div className={`p-2 rounded-lg border text-center ${
+                    room.rules.extraTurnOnSix ? 'bg-emerald-950/40 border-emerald-700/60 text-emerald-300' : 'bg-slate-900 border-slate-800 text-slate-500 line-through'
+                  }`}>
+                    <div className="font-bold">Roll 6</div>
+                    <div className="text-[10px]">{room.rules.extraTurnOnSix ? 'Extra Roll' : 'No Extra'}</div>
+                  </div>
+                  <div className={`p-2 rounded-lg border text-center ${
+                    room.rules.extraTurnOnCapture ? 'bg-emerald-950/40 border-emerald-700/60 text-emerald-300' : 'bg-slate-900 border-slate-800 text-slate-500 line-through'
+                  }`}>
+                    <div className="font-bold">Capture</div>
+                    <div className="text-[10px]">{room.rules.extraTurnOnCapture ? 'Extra Roll' : 'No Extra'}</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Defenses & Safe Zones */}
+              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 space-y-2">
+                <div className="font-bold text-white text-sm">Board Mechanics</div>
+                <div className="flex items-center justify-between text-slate-300">
+                  <span>Star Safe Zones:</span>
+                  <span className={`font-bold ${room.rules.safeZones ? 'text-emerald-400' : 'text-slate-500'}`}>
+                    {room.rules.safeZones ? 'ACTIVE (Pieces protected on star squares)' : 'DISABLED'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-slate-300">
+                  <span>Two-Piece Blockades:</span>
+                  <span className={`font-bold ${room.rules.blockades ? 'text-emerald-400' : 'text-slate-500'}`}>
+                    {room.rules.blockades ? 'ACTIVE (2 pieces block opponent leap)' : 'DISABLED'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Home & Victory */}
+              <div className="p-3 bg-slate-950 rounded-xl border border-slate-800 space-y-2">
+                <div className="font-bold text-white text-sm">Home Entry & Victory</div>
+                <div className="flex items-center justify-between text-slate-300">
+                  <span>Capture Mandate:</span>
+                  <span className={`font-bold ${room.rules.captureRequiredToEnterHome ? 'text-amber-400' : 'text-slate-400'}`}>
+                    {room.rules.captureRequiredToEnterHome ? 'REQUIRED (Must kill ≥1 piece before Home)' : 'NOT REQUIRED'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-slate-300">
+                  <span>Exact Roll to Enter Finish:</span>
+                  <span className={`font-bold ${room.rules.exactRollToEnterHome ? 'text-amber-400' : 'text-slate-400'}`}>
+                    {room.rules.exactRollToEnterHome ? 'ENFORCED (Cannot overshoot)' : 'OFF (Any surplus finishes)'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-slate-300 pt-1 border-t border-slate-900">
+                  <span>Winning Pieces:</span>
+                  <span className="font-bold text-amber-400">
+                    {room.rules.piecesToWin === 1 ? '1 Piece (Blitz Match)' : `${room.rules.piecesToWin || 4} Pieces Reached Home`}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 pt-4 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={() => {
+                  audio.playClick();
+                  setShowRulesModal(false);
+                }}
+                className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs transition-colors cursor-pointer"
+              >
+                Close Rule Inspector
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

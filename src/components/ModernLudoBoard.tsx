@@ -557,15 +557,16 @@ export const ModernLudoBoard: React.FC<ModernLudoBoardProps> = ({
           </div>
 
           {/* Room Rules Card */}
-          <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-3.5 text-[11px] text-slate-400 space-y-1.5 font-mono">
-            <div className="font-bold text-cyan-300 text-xs font-sans">
-              Active Room Configuration:
+          <div className="bg-slate-900/60 border border-slate-800 rounded-xl p-3.5 text-[11px] text-slate-300 space-y-1.5 font-mono">
+            <div className="font-bold text-cyan-300 text-xs font-sans flex items-center justify-between">
+              <span>Standard Modern Rules</span>
+              <span className="text-[10px] text-emerald-400 font-mono">SELECTED</span>
             </div>
-            <div className="text-emerald-400 font-semibold">• 1 required to enter: ON</div>
-            <div>• Extra turn on 1: {room.rules.extraTurnOnOne ? 'ON' : 'OFF'}</div>
-            <div>• Extra turn on capture: {room.rules.extraTurnOnCapture ? 'ON' : 'OFF'}</div>
-            <div>• Safe zones: {room.rules.safeZones ? 'ON' : 'OFF'}</div>
-            <div>• Blockades: {room.rules.blockades ? 'ON' : 'OFF'}</div>
+            <div className="text-emerald-400">• Entry on 6</div>
+            <div>• Extra turn on 6 & capture</div>
+            <div>• Star safe zones active</div>
+            <div>• Blockades active</div>
+            <div>• 4 pieces to win</div>
           </div>
         </div>
       </div>

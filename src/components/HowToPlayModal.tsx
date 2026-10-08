@@ -148,11 +148,19 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({
 
               <div className="p-4 bg-slate-950/80 border border-slate-800 rounded-xl space-y-2">
                 <h3 className="text-sm font-bold text-white">
-                  2. 1 Required to Enter Base
+                  2. Player-Defined Rules Feature
                 </h3>
                 <p>
-                  <strong>A player must get 1 to bring a piece out of the base.</strong> Once a 1 is rolled, the player can choose to deploy an eligible piece onto their starting track square.
+                  In Classic Ludo, players can now customize and define their own rules during game creation, in the team lobby, or before an offline match:
                 </p>
+                <ul className="list-disc list-inside space-y-1 text-slate-400">
+                  <li><strong>Base Entry Roll:</strong> Choose between traditional <strong>1 Only</strong>, standard <strong>6 Only</strong>, or fast-paced <strong>Either 1 or 6</strong>.</li>
+                  <li><strong>Extra Turn Conditions:</strong> Toggle whether extra rolls are awarded on rolling 1, rolling 6, or scoring a capture.</li>
+                  <li><strong>Defense & Safe Zones:</strong> Enable or disable Star Safe Zones and 2-piece Blockades.</li>
+                  <li><strong>Capture Mandate:</strong> Enforce requiring at least 1 capture before any piece is permitted to enter the home column.</li>
+                  <li><strong>Exact Roll Finish:</strong> Decide if pieces require an exact roll to enter the center finish or if excess rolls count.</li>
+                  <li><strong>Pieces to Win:</strong> Choose between a 1-Piece Blitz match up to a full 4-Piece victory!</li>
+                </ul>
               </div>
 
               <div className="p-4 bg-slate-950/80 border border-slate-800 rounded-xl space-y-2">
@@ -185,22 +193,22 @@ export const HowToPlayModal: React.FC<HowToPlayModalProps> = ({
                   1. Modern Ludo Presentation
                 </h3>
                 <p>
-                  Modern visual board with cyber-illumination, glowing neon paths, and animated dice engines, while preserving the authentic Ludo gameplay rules.
+                  Modern visual board with cyber-illumination, glowing neon paths, and animated dice engines with fixed standard Ludo rules.
                 </p>
               </div>
 
               <div className="p-4 bg-slate-950/80 border border-slate-800 rounded-xl space-y-2">
                 <h3 className="text-sm font-bold text-white">
-                  2. Same Authentic Ludo Rules
+                  2. Standard Selected Rules (Fixed)
                 </h3>
                 <p>
-                  Modern Ludo follows the exact same gameplay rules as Classic Ludo:
+                  Modern Ludo uses standard rules with no rule customization:
                 </p>
                 <ul className="list-disc list-inside space-y-1 text-slate-400">
-                  <li><strong>1 is required to enter:</strong> A roll of 1 deploys your piece from the base pod.</li>
-                  <li><strong>Capture mechanics:</strong> Send opposing units back to their base.</li>
-                  <li><strong>Safe Zones & Blockades:</strong> Same strategic defense rules apply.</li>
-                  <li><strong>Nexus Home:</strong> Bring all 4 units to the center Nexus to achieve victory.</li>
+                  <li><strong>Entry on 6:</strong> Roll a 6 to bring pieces out of base.</li>
+                  <li><strong>Extra Roll:</strong> Granted on rolling 6 and on capturing opponent pieces.</li>
+                  <li><strong>Safe Zones & Blockades:</strong> Star safe squares and blockades active.</li>
+                  <li><strong>Victory:</strong> Move all 4 pieces to the center finish.</li>
                 </ul>
               </div>
             </div>

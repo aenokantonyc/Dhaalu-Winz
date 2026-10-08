@@ -17,9 +17,19 @@ export const COLOR_START_POSITIONS: Record<PlayerColor, number> = {
 
 export const TOTAL_STEPS_TO_FINISH = 56; // 0..50 main loop (51 steps), 51..55 home column (5 steps), 56 = Home!
 
+export function isEligibleToEnterBase(diceValue: number, rules: LudoCustomRules): boolean {
+  const entryRule = rules.entryRoll || (rules.oneRequiredToEnter ? '1' : '1');
+  if (entryRule === '1') return diceValue === 1;
+  if (entryRule === '6') return diceValue === 6;
+  if (entryRule === '1_or_6') return diceValue === 1 || diceValue === 6;
+  return diceValue === 1;
+}
+
 export function rollLudoDice(rules: LudoCustomRules): LudoDiceResult {
   const value = Math.floor(Math.random() * 6) + 1; // 1..6
-  const extraTurn = value === 1 && rules.extraTurnOnOne;
+  let extraTurn = false;
+  if (value === 1 && rules.extraTurnOnOne) extraTurn = true;
+  if (value === 6 && rules.extraTurnOnSix) extraTurn = true;
   return { value, extraTurn };
 }
 
@@ -84,7 +94,8 @@ export function getLudoValidMoves(
   playerId: string,
   color: PlayerColor,
   diceValue: number,
-  rules: LudoCustomRules
+  rules: LudoCustomRules,
+  playerCaptures: number = 0
 ): number[] {
   const playerPieces = pieces.filter(p => p.playerId === playerId);
   const validPieceIds: number[] = [];
@@ -93,8 +104,8 @@ export function getLudoValidMoves(
     if (piece.isFinished) continue;
 
     if (piece.step === -1) {
-      // Must roll 1 to enter
-      if (diceValue === 1) {
+      // Check entry rule (1, 6, or 1_or_6)
+      if (isEligibleToEnterBase(diceValue, rules)) {
         // Can enter if start position is not blocked by opponent blockade
         const startTrackIndex = COLOR_START_POSITIONS[color];
         const opponentPiecesAtStart = pieces.filter(
@@ -111,11 +122,26 @@ export function getLudoValidMoves(
       }
     } else {
       const targetStep = piece.step + diceValue;
-      if (targetStep <= TOTAL_STEPS_TO_FINISH) {
-        // Check blockade
-        if (!isBlockedByOpponent(color, piece.step, targetStep, pieces, rules)) {
-          validPieceIds.push(piece.id);
+
+      // Check if capture is required before entering home column
+      if (rules.captureRequiredToEnterHome && playerCaptures === 0 && targetStep > 50) {
+        // Cannot enter home column yet without at least 1 capture
+        continue;
+      }
+
+      // Exact roll check
+      if (rules.exactRollToEnterHome) {
+        if (targetStep > TOTAL_STEPS_TO_FINISH) {
+          // Cannot overshoot finish
+          continue;
         }
+      } else {
+        // If exact roll not required, any roll that reaches or passes 56 finishes
+      }
+
+      // Check blockade
+      if (!isBlockedByOpponent(color, piece.step, Math.min(targetStep, TOTAL_STEPS_TO_FINISH), pieces, rules)) {
+        validPieceIds.push(piece.id);
       }
     }
   }
