@@ -1,0 +1,6 @@
+{
+  "name": "Board Game Platform",
+  "description": "Online and offline multiplayer platform featuring Traditional Dhayam, Classic Ludo, and Modern Ludo with real-time lobbies and custom rules.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
